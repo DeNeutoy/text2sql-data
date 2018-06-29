@@ -13,6 +13,7 @@ print("Running:\n"+ ' '.join(sys.argv))
 
 import numpy as np
 
+JsonDict = Dict[str, Any]
 ## Command line argument handling and default configuration ##
 
 parser = argparse.ArgumentParser(description='A simple template-based text-to-SQL system.')
@@ -26,8 +27,6 @@ parser.add_argument('--do_test_eval', help='Do the final evaluation on the test 
 parser.add_argument('--split', help='Use this split in cross-validation.', type=int)
 
 args = parser.parse_args()
-JsonDict = Dict[str, Any]
-## Input ##
 
 def get_template(sql_tokens: List[str],
                  sql_variables: List[Dict[str, str]],
@@ -57,21 +56,14 @@ def get_template(sql_tokens: List[str],
             template.append(example)
     return template
 
-def insert_variables(sql: str,
-                     sql_variables: List[Dict[str, str]],
-                     sent: str,
-                     sent_variables: Dict[str, str]):
-
+def get_tokens_and_tags(sentence: str, sent_variables: Dict[str, str]):
     """
-    sql: The string sql query.
-    sql_variables: The variables extracted from the sentence and sql query.
-        e.g. [{'example': 'arizona', 'location': 'both', 'name': 'var0', 'type': 'state'}] 
-    sent: The string of the sentence.
+    sentence: The string of the sentence.
     sent_variables: The variable in the sentence and it's actual string. e.g {'var0': 'texas'}
     """
     tokens = []
     tags = []
-    for token in sent.strip().split():
+    for token in sentence.strip().split():
         if (token not in sent_variables) or args.no_vars:
             tokens.append(token)
             tags.append("O")
@@ -80,6 +72,20 @@ def insert_variables(sql: str,
             for word in sent_variables[token].split():
                 tokens.append(word)
                 tags.append(token)
+    return tokens, tags
+
+def insert_variables(sql: str,
+                     sql_variables: List[Dict[str, str]],
+                     sent: str,
+                     sent_variables: Dict[str, str]):
+    """
+    sql: The string sql query.
+    sql_variables: The variables extracted from the sentence and sql query.
+        e.g. [{'example': 'arizona', 'location': 'both', 'name': 'var0', 'type': 'state'}] 
+    sent: The string of the sentence.
+    sent_variables: The variable in the sentence and it's actual string. e.g {'var0': 'texas'}
+    """
+    tokens, tags = get_tokens_and_tags(sent, sent_variables)
 
     sql_tokens = []
     for token in sql.strip().split():
@@ -145,9 +151,6 @@ for filename in args.data:
         if type(data) != list:
             data = [data]
         for example in data:
-            index+=1
-            if index == 2:
-                break
             for dataset, instance in get_tagged_data_for_query(example):
                 if dataset == 'train':
                     train.append(instance)
@@ -162,4 +165,6 @@ for filename in args.data:
                     pass
                 else:
                     assert False, dataset
-        
+
+for x  in dev:
+    print(x)
