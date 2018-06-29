@@ -56,14 +56,15 @@ def get_template(sql_tokens: List[str],
             template.append(example)
     return template
 
-def get_tokens_and_tags(sentence: str, sent_variables: Dict[str, str]):
+def get_tokens_and_tags(sentence: List[str],
+                        sent_variables: Dict[str, str]):
     """
     sentence: The string of the sentence.
     sent_variables: The variable in the sentence and it's actual string. e.g {'var0': 'texas'}
     """
     tokens = []
     tags = []
-    for token in sentence.strip().split():
+    for token in sentence:
         if (token not in sent_variables) or args.no_vars:
             tokens.append(token)
             tags.append("O")
@@ -85,11 +86,13 @@ def insert_variables(sql: str,
     sent: The string of the sentence.
     sent_variables: The variable in the sentence and it's actual string. e.g {'var0': 'texas'}
     """
-    tokens, tags = get_tokens_and_tags(sent, sent_variables)
+    split_sentence = sent.strip().split()
+    tokens, tags = get_tokens_and_tags(split_sentence, sent_variables)
 
     sql_tokens = []
     for token in sql.strip().split():
         # Split variables into  " variable " token sequences.
+        # TODO This is bizare, why are we spliting it like this
         if token.startswith('"%') or token.startswith("'%"):
             sql_tokens.append(token[:2])
             token = token[2:]
@@ -114,26 +117,26 @@ def get_tagged_data_for_query(data: JsonDict):
     # If we're splitting based on SQL queries,
     # we assign whole splits of questions which 
     # have a similar SQL template to the same split.
-    dataset: str = data['query-split']
+    dataset_split: str = data['query-split']
     for sent_info in data['sentences']:
         # Instead, if we're using the question split,
         # we take the split according to the individual question.
         if not args.query_split:
-            dataset = sent_info['question-split']
+            dataset_split = sent_info['question-split']
 
         # Some datasets require splits because they are small.
         if args.split is not None:
-            if str(args.split) == str(dataset):
-                dataset = "test"
+            if str(args.split) == str(dataset_split):
+                dataset_split = "test"
             else:
-                dataset = "train"
+                dataset_split = "train"
 
         for sql in data["sql"]:
             sql_vars = data['variables']
             text = sent_info['text']
             text_vars = sent_info['variables']
 
-            yield (dataset, insert_variables(sql, sql_vars, text, text_vars))
+            yield (dataset_split, insert_variables(sql, sql_vars, text, text_vars))
 
             # Some questions might have multiple equivelent SQL statements.
             # By default, we just use the first one. TODO(MARK) - Use the shortest?
