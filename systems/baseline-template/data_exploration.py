@@ -168,6 +168,3 @@ for filename in args.data:
                     pass
                 else:
                     assert False, dataset
-
-for x  in dev:
-    print(x)
