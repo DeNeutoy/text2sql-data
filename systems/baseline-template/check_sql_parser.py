@@ -206,135 +206,6 @@ def get_train_dev_test_splits(filename: str):
 # tablename in (tablename1, tablename2)
 # 
 # JOIN, seems hard.
-FULL_GRAMMAR = Grammar(
-    r"""
-    stmt     = query ws ";"?
-    query    = ws select_cores orderby? limit? ws
-    select_cores   = select_core (compound_op select_core)*
-    select_core    = SELECT wsp select_results from_clause? where_clause? gb_clause?
-    select_results = select_result (ws "," ws select_result)*
-    select_result  = sel_res_all_star / sel_res_tab_star / sel_res_val / sel_res_col 
-    sel_res_tab_star = name ".*"
-    sel_res_all_star = "*"
-    sel_res_val    = expr (AS wsp name)?
-    sel_res_col    = col_ref (AS wsp name)
-    from_clause    = FROM join_source
-    join_source    = ws single_source (ws "," ws single_source)*
-    single_source  = source_table / source_subq
-    source_table   = table_name (AS wsp name)?
-    source_subq    = "(" ws query ws ")" (AS ws name)?
-    where_clause   = WHERE wsp expr (AND wsp expr)*
-    gb_clause      = GROUP BY group_clause having_clause?
-    group_clause   = grouping_term (ws "," grouping_term)*
-    grouping_term  = ws expr
-    having_clause  = HAVING expr
-
-    orderby        = ORDER BY ordering_term (ws "," ordering_term)*
-    ordering_term  = ws expr (ASC/DESC)?
-    limit          = LIMIT wsp expr (OFFSET expr)?
-
-    col_ref        = (table_name ".")? column_name
-    expr     = btwnexpr / biexpr / unexpr / value
-    btwnexpr = value BETWEEN wsp value AND wsp value
-    biexpr   = value ws binaryop_no_andor ws expr
-    unexpr   = unaryop expr
-    value    = parenval /
-               number /
-               boolean /
-               function /
-               col_ref /
-               string /
-               attr
-    parenval = "(" ws expr ws ")"
-    function = fname "(" ws arg_list? ws ")"
-    arg_list = expr (ws "," ws expr)*
-    number   = ~"\d*\.?\d+"i
-    string   = ~"([\"\'])(\\\\?.)*?\\1"i
-    attr     = ~"\w[\w\d]*"i
-    fname    = ~"\w[\w\d]*"i
-    boolean  = "true" / "false"
-    compound_op = "UNION" / "union"
-    binaryop = "+" / "-" / "*" / "/" / "=" / "<>" /
-               "<=" / ">" / "<" / ">" / "and" / "AND" / "or" / "OR"
-    binaryop_no_andor = "+" / "-" / "*" / "/" / "=" / "<>" /
-               "<=" / ">" / "<" / ">" 
-    unaryop  = "+" / "-" / "not"
-    ws       = ~"\s*"i
-    wsp      = ~"\s+"i
-    name       = ~"[a-zA-Z]\w*"i
-    table_name = name
-    column_name = name
-    ADD = wsp "ADD"
-    ALL = wsp "ALL"
-    ALTER = wsp "ALTER"
-    AND = wsp ("AND" / "and")
-    AS = wsp ("AS" / "as")
-    ASC = wsp "ASC"
-    BETWEEN = wsp ("BETWEEN" / "between")
-    BY = wsp "BY"
-    CAST = wsp "CAST"
-    COLUMN = wsp "COLUMN"
-    DESC = wsp "DESC"
-    DISTINCT = wsp "DISTINCT"
-    E = "E"
-    ESCAPE = wsp "ESCAPE"
-    EXCEPT = wsp "EXCEPT"
-    EXISTS = wsp "EXISTS"
-    EXPLAIN = ws "EXPLAIN"
-    EVENT = ws "EVENT"
-    FORALL = wsp "FORALL"
-    FROM = wsp "FROM"
-    GLOB = wsp "GLOB"
-    GROUP = wsp "GROUP"
-    HAVING = wsp "HAVING"
-    IN = wsp "IN"
-    INNER = wsp "INNER"
-    INSERT = ws "INSERT"
-    INTERSECT = wsp "INTERSECT"
-    INTO = wsp "INTO"
-    IS = wsp "IS"
-    ISNULL = wsp "ISNULL"
-    JOIN = wsp "JOIN"
-    KEY = wsp "KEY"
-    LEFT = wsp "LEFT"
-    LIKE = wsp "LIKE"
-    LIMIT = wsp "LIMIT"
-    MATCH = wsp "MATCH"
-    NO = wsp "NO"
-    NOT = wsp "NOT"
-    NOTNULL = wsp "NOTNULL"
-    NULL = wsp "NULL"
-    OF = wsp "OF"
-    OFFSET = wsp "OFFSET"
-    ON = wsp "ON"
-    OR = wsp "OR"
-    ORDER = wsp "ORDER"
-    OUTER = wsp "OUTER"
-    PRIMARY = wsp "PRIMARY"
-    QUERY = wsp "QUERY"
-    RAISE = wsp "RAISE"
-    REFERENCES = wsp "REFERENCES"
-    REGEXP = wsp "REGEXP"
-    RENAME = wsp "RENAME"
-    REPLACE = ws "REPLACE"
-    RETURN = wsp "RETURN"
-    ROW = wsp "ROW"
-    SAVEPOINT = wsp "SAVEPOINT"
-    SELECT = ws "SELECT"
-    SET = wsp "SET"
-    TABLE = wsp "TABLE"
-    TEMP = wsp "TEMP"
-    TEMPORARY = wsp "TEMPORARY"
-    THEN = wsp "THEN"
-    TO = wsp "TO"
-    UNION = wsp "UNION"
-    USING = wsp "USING"
-    VALUES = wsp "VALUES"
-    VIRTUAL = wsp "VIRTUAL"
-    WITH = wsp "WITH"
-    WHERE = wsp "WHERE"
-    """
-)
 
 # TODO:
 # string set isn't an expr, it should only be in in_expr
@@ -346,36 +217,37 @@ FULL_GRAMMAR = Grammar(
 
 SQL_GRAMMAR2 = Grammar(
     r"""
-    stmt             = query ws ";"?
-    query            = ws select_core groupby_clause? orderby_clause? ws limit?
-    select_core      = SELECT DISTINCT? select_results from_clause? where_clause?
-    select_results   = ws select_result (ws "," ws select_result)*
+    stmt             = (query ws ";") / (query ws)
+    query            = (ws select_core groupby_clause orderby_clause ws limit) / (ws select_core groupby_clause ws limit) / (ws select_core orderby_clause ws limit) / (ws select_core groupby_clause) / (ws select_core orderby_clause) / (ws select_core)
+    select_core      = (select_with_distinct select_results from_clause where_clause) / (select_with_distinct select_results from_clause) / (select_with_distinct select_results where_clause) / (select_with_distinct select_results)
+    select_with_distinct = (SELECT DISTINCT) / SELECT
+    select_results   = (ws select_result ws "," ws select_results) / (ws select_result)
     select_result    = sel_res_all_star / sel_res_tab_star / sel_res_val / sel_res_col
 
     sel_res_tab_star = name ".*"
     sel_res_all_star = "*"
-    sel_res_val      = expr (AS wsp name)?
+    sel_res_val      = (expr AS wsp name) / expr
     sel_res_col      = col_ref (AS wsp name)
 
     from_clause      = FROM source
-    source           = ws single_source (ws "," ws single_source)*
+    source           = (ws single_source ws "," ws source) / (ws single_source)
     single_source    = source_table / source_subq
     source_table     = table_name (AS wsp name)
-    source_subq      = "(" ws query ws ")" (AS ws name)?
-    where_clause     = WHERE wsp expr (AND wsp expr)*
+    source_subq      = ("(" ws query ws ")" AS ws name) / ("(" ws query ws ")")
+    where_clause     = (WHERE wsp expr where_conj) / (WHERE wsp expr)
+    where_conj       = (AND wsp expr where_conj) / (AND wsp expr) 
     
-    groupby_clause   = GROUP BY group_clause having_clause?
-    group_clause     = grouping_term (ws "," grouping_term)*
-    grouping_term    = ws expr
+    groupby_clause   = (GROUP BY group_clause having_clause) / (GROUP BY group_clause)
+    group_clause     = (ws expr ws "," group_clause) / (ws expr)
     having_clause    = HAVING ws expr
 
     orderby_clause   = ORDER BY order_clause
-    order_clause     = ordering_term (ws "," ordering_term)*
-    ordering_term    = ws expr ordering?
+    order_clause     = (ordering_term ws "," order_clause) / ordering_term
+    ordering_term    = (ws expr ordering) / (ws expr)
     ordering         = ASC / DESC
     limit            = LIMIT ws number
 
-    col_ref          = (table_name ".")? column_name
+    col_ref          = (table_name "." column_name) / column_name
     table_name       = name
     column_name      = name
     ws               = ~"\s*"i
@@ -384,16 +256,18 @@ SQL_GRAMMAR2 = Grammar(
 
     expr             = in_expr / like_expr / between_expr / binary_expr / unary_expr / source_subq / value / string_set
     like_expr        = value wsp LIKE ws string
-    in_expr          = value wsp NOT? IN wsp expr
+    in_expr          = (value wsp NOT IN wsp expr) / (value wsp IN wsp expr)
     between_expr     = value BETWEEN wsp value AND wsp value
     binary_expr      = value ws binaryop ws expr
     unary_expr       = unaryop expr
     value            = parenval / number / boolean / function / col_ref / string
     parenval         = "(" ws expr ws ")"
-    function         = fname ws "(" ws DISTINCT? ws arg_list? ws ")"
-    arg_list         = (expr (ws "," ws expr)*) / "*"
+    function         = (fname ws "(" ws DISTINCT ws arg_list_or_star ws ")") / (fname ws "(" ws arg_list_or_star ws ")")
+    arg_list_or_star = arg_list / "*"
+    arg_list         = (expr ws "," ws arg_list) / expr
     number           = ~"\d*\.?\d+"i
-    string_set       = ws "(" ws string (ws "," ws string)* ws ")"
+    string_set       = ws "(" ws string_set_vals ws ")"
+    string_set_vals  = (string ws "," ws string_set_vals) / string
     string           = ~"\'.*?\'"i
     fname            = "COUNT" / "SUM" / "MAX" / "MIN" / "AVG"
     boolean          = "true" / "false"
@@ -420,63 +294,6 @@ SQL_GRAMMAR2 = Grammar(
     LIKE     = ws "LIKE"
     """
 )
-
-SQL_GRAMMAR = Grammar(r"""
-    stmt                = query ";" ws
-
-    query               = ws lparen? ws select_clause ws select_results ws "FROM" ws table_refs_or_query ws where_clause? rparen? ws
-
-    select_clause       = "SELECT" ws "DISTINCT"?
-    select_results      = (agg (ws binaryop ws agg)*) / col_refs
-    agg                 = (agg_func ws lparen ws "DISTINCT"? ws (lparen ws)? col_ref ws rparen (ws rparen)? ) / biexpr
-    agg_func            = "MIN" / "min" / "MAX" / "max" / "COUNT" / "count" / "AVG" / "avg" / "SUM" / "sum"
-    
-    col_refs            = (col_ref (ws "," ws col_ref)*)  
-    col_ref             = (table_name ws "." ws column_name) / column_name / asterisk
-
-    table_refs_or_query  = table_refs / query
-    table_refs          = table_name (ws "," ws table_name)* 
-    table_name          = name (ws "AS" ws name)?
-
-    column_name         = name
-
-    where_clause        = "WHERE" ws lparen? ws condition_paren (ws conj ws condition_paren)* ws rparen? ws
-    
-    condition_paren     = not? (lparen ws)? condition_paren2 (ws rparen)?
-    condition_paren2    = not? (lparen ws)? condition_paren3 (ws rparen)?
-    condition_paren3    = not? (lparen ws)? condition (ws rparen)?
-    condition           = in_clause / ternaryexpr / biexpr 
-
-    in_clause       = (lparen ws)? col_ref ws not? "IN" ws in_args (ws rparen)?
-    in_args         = (lparen ws string (ws "," ws string ws)* ws rparen) / col_refs / query
-
-    biexpr          = ( col_ref ws binaryop ws value) / (value ws binaryop ws value) / ( col_ref ws "LIKE" ws string)
-    binaryop        = "+" / "-" / "*" / "/" / "=" / 
-                      ">=" / "<=" / "<>" / ">" / "<" / "is" / "IS"
-
-    ternaryexpr     = col_ref ws not? "BETWEEN" ws value ws and value ws
-    
-    value           = not? ws? pos_value
-    pos_value       = ("ALL" ws query) / ("ANY" ws query) / query / number / boolean / col_ref / string / agg_results / "NULL"
-
-    agg_results     = ws lparen?  ws select_clause ws agg ws "FROM" ws table_name ws where_clause rparen?  ws
-
-    number          = ~"\d*\.?\d+"i
-    string          = ~"\'.*?\'"i
-    boolean         = "true" / "false"
-
-    name                = ~"[a-zA-Z]\w*"i
-    ws                  = ~"\s*"i
-
-    lparen              = "(" 
-    rparen              = ")"
-    conj            = and / or 
-    and             = "AND" ws 
-    or              = "OR" ws
-    not             = ("NOT" ws ) / ("not" ws)
-    asterisk        = "*" / "1"
-
-    """)
 
 class SQLVisitor(NodeVisitor):
     grammar = SQL_GRAMMAR2
@@ -522,16 +339,7 @@ def parse_dataset(filename: str):
 
     tests = ["SELECT TABLEalias0.ROW FROM TABLE AS TABLEalias0 WHERE TABLEalias0.ROW2 > 3 ORDER BY TABLEalias0.ROW ;",
             "SELECT TABLEalias0.ROW FROM TABLE AS TABLEalias0 ORDER BY TABLEalias0.ROW ;"]
-    for t in tests:
-        sql_visitor = SQLVisitor()
-        try:
-            x = sql_visitor.parse(t)
-            for rule in x:
-                print(rule)
-        except Exception as e:
-            print(e)
-            print(t)
-        print()
+
     for (tokens, tags, template) in train + dev + test:
         num_queries += 1
         sql_visitor = SQLVisitor()
@@ -545,7 +353,6 @@ def parse_dataset(filename: str):
                 print(e)
                 print(" ".join(tokens))
                 print(sqlparse.format(template, reindent=True))
-                pass
     print(f"Parsed {num_parsed} out of {num_queries} queries, coverage {num_parsed/num_queries}")
 
 parse_dataset(args.data)
