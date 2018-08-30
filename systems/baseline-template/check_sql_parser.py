@@ -36,31 +36,22 @@ parser.add_argument('--split', help='Use this split in cross-validation.', type=
 args = parser.parse_args()
 
 def get_template(sql_tokens: List[str],
-                 sql_variables: List[Dict[str, str]],
+                 sql_variables: Dict[str, str],
                  sent_variables: Dict[str, str]):
     template = []
     for token in sql_tokens:
-        if (token not in sent_variables) and (token not in sql_variables): # I think this second clause is always false
+        if (token not in sent_variables) and (token not in sql_variables):
             template.append(token)
         elif token in sent_variables:
+            # This is the case that we have the variable
+            # in the sql variables but not the sentence variables.
+            # Apparently this is denoted with a "".
             if sent_variables[token] == '':
-                # sentence variables can be empty. If so,
-                # find the variable in the sql_variables and use that name.
-                example = None
-                for variable in sql_variables:
-                    if variable['name'] == token:
-                        example = variable['example']
-                assert example is not None
-                template.append(example)
+                template.append(sql_variables[token])
             else:
                 template.append(token)
-        elif any([token == x["name"] for x in sql_variables]):
-            example = None
-            for variable in sql_variables:
-                if variable['name'] == token:
-                    example = variable['example']
-            assert example is not None
-            template.append(example)
+        elif token in sql_variables:
+            template.append(sql_variables[token])
     return template
 
 def get_tokens_and_tags(sentence: List[str],
@@ -150,12 +141,16 @@ def get_tagged_data_for_query(data: JsonDict):
             else:
                 dataset_split = "train"
 
+        # Loop over the different sql statements with equivelent semantics
         for sql in data["sql"]:
-            sql_vars = data['variables']
+            sql_variables = {}
+            for variable in data['variables']:
+                sql_variables[variable['name']] = variable['example']
+            
             text = sent_info['text']
             text_vars = sent_info['variables']
 
-            yield (dataset_split, insert_variables(sql, sql_vars, text, text_vars))
+            yield (dataset_split, insert_variables(sql, sql_variables, text, text_vars))
 
             # Some questions might have multiple equivelent SQL statements.
             # By default, we just use the first one. TODO(MARK) - Use the shortest?
